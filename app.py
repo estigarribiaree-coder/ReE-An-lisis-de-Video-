@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from tkinter import ttk, filedialog, messagebox
 import cv2
 import os
 import json

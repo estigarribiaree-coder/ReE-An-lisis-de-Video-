@@ -145,7 +145,7 @@ elif st.session_state.pantalla == "configuracion_proyecto":
 
 
 # ==========================================
-# PANTALLA 3: ÁREA DE TRABAJO TÁCTICO
+# PANTALLA 3: ÁREA DE TRABAJO TÁCTICO INTEGRADA
 # ==========================================
 elif st.session_state.pantalla == "trabajo":
     col_nav1, col_nav2 = st.columns([6, 1])
@@ -168,7 +168,7 @@ elif st.session_state.pantalla == "trabajo":
         if width <= 0: width = 1280
         if height <= 0: height = 720
 
-        # --- PANEL LATERAL: HERRAMIENTAS Y FIGURAS TÁCTICAS ---
+        # --- PANEL LATERAL: CONFIGURACIÓN DE HERRAMIENTAS Y FIGURAS ---
         st.sidebar.header("🛠️ Herramientas y Figuras")
         
         tipo_herramienta = st.sidebar.selectbox(
@@ -231,90 +231,108 @@ elif st.session_state.pantalla == "trabajo":
         else:
             st.sidebar.info("No hay elementos en este proyecto.")
 
-        # --- SECCIÓN PRINCIPAL: REPRODUCTOR NATIVO Y EDITOR DE FOTOGRAMAS ---
-        tab_rep, tab_edit = st.tabs(["🎬 Reproductor General (Play/Pausa)", "✏️ Editor de Fotograma y Figuras"])
+        # --- PANTALLA PRINCIPAL: CONTROLES DE REPRODUCCIÓN + FOTOGRAMA EDITABLE ---
+        st.subheader("🎬 Panel de Control y Análisis Táctico")
 
-        with tab_rep:
-            st.subheader("Reproductor de Video del Partido")
-            st.write("Usa los controles nativos del reproductor para reproducir, pausar o adelantar el video fluidamente.")
-            st.video(st.session_state.video_path)
+        # Barra de botones rápidos de reproducción
+        col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
+        with col_c1:
+            if st.button("⏮ -10 F"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+                st.rerun()
+        with col_c2:
+            if st.button("⬅️ Anterior"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
+                st.rerun()
+        with col_c3:
+            if st.button("➡️ Siguiente"):
+                st.session_state.current_frame = min(total_frames - 1, st.session_state.current_frame + 1)
+                st.rerun()
+        with col_c4:
+            if st.button("+10 F ⏭"):
+                st.session_state.current_frame = min(total_frames - 1, st.session_state.current_frame + 10)
+                st.rerun()
+        with col_c5:
+            if st.button("🔄 Ir al Inicio"):
+                st.session_state.current_frame = 0
+                st.rerun()
 
-        with tab_edit:
-            st.subheader("Editor de Fotograma con Herramientas Geométricas")
-            st.write("Selecciona el fotograma exacto donde deseas incrustar una figura, triángulo, círculo o foco personalizado.")
-            
-            st.session_state.current_frame = st.slider(
-                "Seleccionar Fotograma de Trabajo",
-                0,
-                max(0, total_frames - 1),
-                st.session_state.current_frame
-            )
+        # Línea de tiempo interactiva (Slider principal)
+        nuevo_frame = st.slider(
+            "Línea de Tiempo del Video (Mueve para buscar fotograma)",
+            0,
+            max(0, total_frames - 1),
+            st.session_state.current_frame
+        )
+        if nuevo_frame != st.session_state.current_frame:
+            st.session_state.current_frame = nuevo_frame
+            st.rerun()
 
-            # Extraer y procesar el fotograma seleccionado con OpenCV
-            cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state.current_frame)
-            ret, frame = cap.read()
+        # Leer fotograma actual con OpenCV
+        cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state.current_frame)
+        ret, frame = cap.read()
 
-            if ret and frame is not None:
-                # Renderizar los elementos tácticos que pertenecen a este fotograma
-                for el in st.session_state.elementos_tacticos:
-                    if el["frame"] == st.session_state.current_frame:
-                        t = el["tipo"]
-                        c = el["color_rgb"]
-                        inte = el["intensidad"]
-                        g = el["grosor"]
-                        
-                        if t == "Foco Jugador (Moderno)":
-                            cx, cy = int(el["x1"]), int(el["y1"])
-                            overlay = frame.copy()
-                            cv2.circle(overlay, (cx, cy), 50, c, -1)
-                            cv2.addWeighted(overlay, inte, frame, 1.0 - inte, 0, frame)
-                            cv2.circle(frame, (cx, cy), 50, c, g)
-                            cv2.circle(frame, (cx, cy), 58, c, 1)
-                            if el["texto"]:
-                                (tw, th), _ = cv2.getTextSize(el["texto"], cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                                tx, ty = cx - (tw // 2), cy - 65
-                                cv2.rectangle(frame, (tx - 6, ty - th - 6), (tx + tw + 6, ty + 6), (20, 20, 20), -1)
-                                cv2.putText(frame, el["texto"], (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        if ret and frame is not None:
+            # Dibujar elementos tácticos guardados en este fotograma
+            for el in st.session_state.elementos_tacticos:
+                if el["frame"] == st.session_state.current_frame:
+                    t = el["tipo"]
+                    c = el["color_rgb"]
+                    inte = el["intensidad"]
+                    g = el["grosor"]
+                    
+                    if t == "Foco Jugador (Moderno)":
+                        cx, cy = int(el["x1"]), int(el["y1"])
+                        overlay = frame.copy()
+                        cv2.circle(overlay, (cx, cy), 50, c, -1)
+                        cv2.addWeighted(overlay, inte, frame, 1.0 - inte, 0, frame)
+                        cv2.circle(frame, (cx, cy), 50, c, g)
+                        cv2.circle(frame, (cx, cy), 58, c, 1)
+                        if el["texto"]:
+                            (tw, th), _ = cv2.getTextSize(el["texto"], cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                            tx, ty = cx - (tw // 2), cy - 65
+                            cv2.rectangle(frame, (tx - 6, ty - th - 6), (tx + tw + 6, ty + 6), (20, 20, 20), -1)
+                            cv2.putText(frame, el["texto"], (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-                        elif t == "Línea":
-                            cv2.line(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g)
+                    elif t == "Línea":
+                        cv2.line(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g)
 
-                        elif t == "Flecha Recta":
-                            cv2.arrowedLine(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g, tipLength=0.2)
+                    elif t == "Flecha Recta":
+                        cv2.arrowedLine(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g, tipLength=0.2)
 
-                        elif t == "Flecha Curva":
-                            pt1 = (int(el["x1"]), int(el["y1"]))
-                            pt2 = (int(el["x2"]), int(el["y2"]))
-                            mid = ((pt1[0] + pt2[0]) // 2 + 50, (pt1[1] + pt2[1]) // 2 - 50)
-                            pts_curve = np.array([pt1, mid, pt2], np.int32)
-                            cv2.polylines(frame, [pts_curve], False, c, g)
-                            cv2.circle(frame, pt2, 6, c, -1)
+                    elif t == "Flecha Curva":
+                        pt1 = (int(el["x1"]), int(el["y1"]))
+                        pt2 = (int(el["x2"]), int(el["y2"]))
+                        mid = ((pt1[0] + pt2[0]) // 2 + 50, (pt1[1] + pt2[1]) // 2 - 50)
+                        pts_curve = np.array([pt1, mid, pt2], np.int32)
+                        cv2.polylines(frame, [pts_curve], False, c, g)
+                        cv2.circle(frame, pt2, 6, c, -1)
 
-                        elif t == "Círculo":
-                            radio = int(np.hypot(el["x2"] - el["x1"], el["y2"] - el["y1"]))
-                            cv2.circle(frame, (int(el["x1"]), int(el["y1"])), max(15, radio), c, g)
+                    elif t == "Círculo":
+                        radio = int(np.hypot(el["x2"] - el["x1"], el["y2"] - el["y1"]))
+                        cv2.circle(frame, (int(el["x1"]), int(el["y1"])), max(15, radio), c, g)
 
-                        elif t in ["Triángulo", "Cuadrado", "Rombo"]:
-                            x, y = int(el["x1"]), int(el["y1"])
-                            sz = 70
-                            if t == "Triángulo":
-                                pts = np.array([[x, y - sz], [x - sz, y + sz], [x + sz, y + sz]], np.int32)
-                            elif t == "Cuadrado":
-                                pts = np.array([[x - sz, y - sz], [x + sz, y - sz], [x + sz, y + sz], [x - sz, y + sz]], np.int32)
-                            elif t == "Rombo":
-                                pts = np.array([[x, y - sz], [x + sz, y], [x, y + sz], [x - sz, y]], np.int32)
-                            cv2.polylines(frame, [pts], True, c, g)
+                    elif t in ["Triángulo", "Cuadrado", "Rombo"]:
+                        x, y = int(el["x1"]), int(el["y1"])
+                        sz = 70
+                        if t == "Triángulo":
+                            pts = np.array([[x, y - sz], [x - sz, y + sz], [x + sz, y + sz]], np.int32)
+                        elif t == "Cuadrado":
+                            pts = np.array([[x - sz, y - sz], [x + sz, y - sz], [x + sz, y + sz], [x - sz, y + sz]], np.int32)
+                        elif t == "Rombo":
+                            pts = np.array([[x, y - sz], [x + sz, y], [x, y + sz], [x - sz, y]], np.int32)
+                        cv2.polylines(frame, [pts], True, c, g)
 
-                # Mostrar la imagen con las figuras dibujadas
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                st.image(frame_rgb, caption=f"Fotograma {st.session_state.current_frame} de {total_frames}", use_container_width=True)
+            # Mostrar imagen procesada en pantalla
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            st.image(frame_rgb, caption=f"Fotograma actual: {st.session_state.current_frame} de {total_frames}", use_container_width=True)
 
-                elementos_marcador = [e for e in st.session_state.elementos_tacticos if e["frame"] == st.session_state.current_frame]
-                if elementos_marcador:
-                    st.info(f"📌 {len(elementos_marcador)} elemento(s) táctico(s) activo(s) en este fotograma.")
-            else:
-                st.error("No se pudo leer el fotograma.")
-
+            elementos_marcador = [e for e in st.session_state.elementos_tacticos if e["frame"] == st.session_state.current_frame]
+            if elementos_marcador:
+                st.info(f"📌 {len(elementos_marcador)} elemento(s) táctico(s) dibujado(s) en este fotograma.")
+        else:
+            st.error("No se pudo leer el fotograma del video.")
+        
         cap.release()
     else:
         st.warning("No hay ningún video cargado. Vuelve a configuración para seleccionar un proyecto con video.")

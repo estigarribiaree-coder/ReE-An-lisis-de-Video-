@@ -1,70 +1,80 @@
 import streamlit as st
 
+# Configuración inicial para móviles (ancho adaptable)
 st.set_page_config(
-    page_title="Analizador de Video - Fútbol",
-    layout="wide"
+    page_title="Analizador Táctico Móvil",
+    layout="centered"  # Ideal para pantallas de celular
 )
 
-st.title("⚽ Analizador de Video Táctico (Offline)")
-st.write("Herramienta de etiquetado y análisis para cuerpos técnicos.")
+# Estilos CSS personalizados para adaptar la interfaz en Android
+st.markdown("""
+    <style>
+    .stButton button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+    /* Ocultar elementos sobrantes de Streamlit en mobile */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
-# Layout principal en dos columnas (Video y Dashboard)
-col_video, col_dashboard = st.columns([2, 1])
+st.title("⚽ Tactical Video App")
+st.markdown("---")
 
-with col_video:
-    st.subheader("Reproductor de Video")
-    
-    # Subir archivo de video local
-    video_file = st.file_uploader("Cargar video del partido (MP4, MOV)", type=["mp4", "mov", "mkv"])
-    
-    if video_file is not None:
-        st.video(video_file)
-        
-        # Simulación de controles de precisión
-        st.markdown("### Controles de Precisión")
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1:
-            if st.button("⏮ -1 Frame"):
-                st.toast("Retrocediendo un fotograma...")
-        with c2:
-            if st.button("▶ Play / ⏸ Pause"):
-                pass
-        with c3:
-            if st.button("⏭ +1 Frame"):
-                st.toast("Avanzando un fotograma...")
-        with c4:
-            st.selectbox("Velocidad", ["0.25x", "0.5x", "1.0x"], index=2, label_visibility="collapsed")
-        with c5:
-            st.toggle("Modo Dibujo ✏️")
-    else:
-        st.info("👈 Sube un archivo de video para comenzar el análisis.")
+# 1. Cargar video
+video_file = st.file_uploader("Cargar video del partido (MP4)", type=["mp4", "mov", "mkv"])
 
-with col_dashboard:
-    st.subheader("Panel de Etiquetado")
+if video_file is not None:
+    # Usamos un contenedor centrado para simular la pantalla de la app móvil
+    st.subheader("📺 Reproductor Táctico")
     
-    # Selector de jugador rápido
-    jugador = st.selectbox("Jugador Asociado", ["Sin seleccionar", "#10 - Mac Allister", "#5 - Paredes", "#9 - Julián Álvarez"])
+    # Contenedor del video con controles limpios inferiores
+    # Nota: st.video por defecto muestra los controles abajo si no se interactúa, 
+    # pero para evitar el botón gigante central, estructuramos una botonera táctica directa.
+    st.video(video_file)
     
     st.markdown("---")
-    st.markdown("**Acciones Ofensivas**")
-    col_b1, col_b2 = st.columns(2)
-    with col_b1:
-        if st.button("⚽ Gol", use_container_width=True):
-            st.success("¡Gol registrado!")
-    with col_b2:
-        if st.button("🎯 Disparo", use_container_width=True):
-            st.info("Disparo registrado")
+    st.subheader("🎛️ Controles de Precisión y Dibujo")
+    
+    # Fila de controles adaptada para dedos (táctil en Android)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("⏮ -Frame"):
+            st.toast("Fotograma atrás")
+    with col2:
+        if st.button("⏯ Play/Pausa"):
+            st.toast("Alternando reproducción")
+    with col3:
+        if st.button("⏭ +Frame"):
+            st.toast("Fotograma adelante")
 
-    if st.button("🔄 Recuperación", use_container_width=True):
-        st.info("Recuperación registrada")
-        
-    if st.button("⚠️ Pérdida", use_container_width=True):
-        st.warning("Pérdida registrada")
-
+    # Sección de Dibujo / Telestrator (Ideal para marcar jugadores en mobile)
     st.markdown("---")
-    st.subheader("Timeline / Eventos Guardados")
-    st.write("*(Aquí aparecerán los recortes en orden cronológico)*")
-    st.dataframe(
-        data={"Minuto": ["12:45", "22:10"], "Evento": ["Gol", "Recuperación"], "Jugador": ["Julián Álvarez", "Paredes"]},
-        use_container_width=True
+    st.subheader("✏️ Herramientas Tácticas (Telestrator)")
+    
+    herramienta = st.selectbox(
+        "Seleccionar elemento a incorporar:",
+        ["Sin selección", "🔴 Círculo / Jugador", "➡️ Flecha de Movimiento", "📏 Línea de Pase / Offside"]
     )
+    
+    if herramienta != "Sin selección":
+        st.info(f"Modo activo: **{herramienta}**. Toca la pantalla para ubicarlo sobre el video.")
+
+    st.markdown("---")
+    st.subheader("📋 Panel de Etiquetado Rápido")
+    
+    # Botones grandes ideales para celulares
+    jugador_tag = st.selectbox("Jugador", ["#10 - Mac Allister", "#5 - Paredes", "#9 - Julián Álvarez"])
+    
+    b_col1, b_col2 = st.columns(2)
+    with b_col1:
+        if st.button("⚽ Gol / Tiro", use_container_width=True):
+            st.success("¡Registrado!")
+    with b_col2:
+        if st.button("⚠️ Pérdida / Falta", use_container_width=True):
+            st.warning("¡Registrado!")
+
+else:
+    st.info("👆 Sube un video desde tu dispositivo para empezar el análisis.")

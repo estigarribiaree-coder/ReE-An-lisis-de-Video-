@@ -32,6 +32,12 @@ def establecer_fondo(imagen_path):
             color: white;
             box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
         }}
+        .reproductor-clasico {{
+            background-color: #1e293b;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+        }}
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
@@ -154,6 +160,8 @@ elif st.session_state.pantalla == "trabajo":
     if st.session_state.video_path:
         cap = cv2.VideoCapture(st.session_state.video_path)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0: fps = 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
@@ -194,28 +202,14 @@ elif st.session_state.pantalla == "trabajo":
             st.session_state.elementos_tacticos = []
             st.rerun()
 
-        # --- SECTOR DE REPRODUCTOR DE VIDEO CLÁSICO ---
-        st.subheader("🎬 Reproductor de Video")
-        st.write("Reproduce y pausa el video de forma clásica mediante los controles nativos:")
-        st.video(st.session_state.video_path)
+        # --- SECTOR DE FOTOGRAMA Y REPRODUCTOR CLÁSICO ---
+        st.subheader("🎬 Reproductor de Video Clásico y Análisis")
 
-        st.markdown("---")
-
-        # --- SECTOR DE FOTOGRAMA Y ANÁLISIS ESPECÍFICO ---
-        st.subheader("🖼️ Sector de Fotograma y Dibujo Táctico")
-        
-        st.session_state.current_frame = st.slider(
-            "Seleccionar Fotograma de Trabajo",
-            0,
-            max(0, total_frames - 1),
-            st.session_state.current_frame
-        )
-
+        # Visualizador de fotograma con elementos tácticos
         cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state.current_frame)
         ret, frame = cap.read()
 
         if ret and frame is not None:
-            # Dibujar elementos guardados en este fotograma
             for el in st.session_state.elementos_tacticos:
                 if el["frame"] == st.session_state.current_frame:
                     t = el["tipo"]
@@ -238,9 +232,54 @@ elif st.session_state.pantalla == "trabajo":
                         cv2.polylines(frame, [pts], True, c, g)
 
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            st.image(frame_rgb, caption=f"Fotograma Actual: {st.session_state.current_frame} / {total_frames}", use_container_width=True)
+            st.image(frame_rgb, use_container_width=True)
         else:
             st.error("Error al leer el fotograma.")
+
+        # --- BARRA DE CONTROL CLÁSICA (Estilo SMPlayer / Barra inferior) ---
+        st.markdown("<div class='reproductor-clasico'>", unsafe_allow_html=True)
+        
+        b1, b2, b3, b4, b5, b6 = st.columns([1, 1, 1, 1, 1, 3])
+        with b1:
+            if st.button("⏮"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+                st.rerun()
+        with b2:
+            if st.button("◀"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
+                st.rerun()
+        with b3:
+            if st.button("▶"):
+                st.session_state.current_frame = min(total_frames - 1, st.session_state.current_frame + 1)
+                st.rerun()
+        with b4:
+            if st.button("⏹"):
+                st.session_state.current_frame = 0
+                st.rerun()
+        with b5:
+            if st.button("⏭"):
+                st.session_state.current_frame = min(total_frames - 1, st.session_state.current_frame + 10)
+                st.rerun()
+        with b6:
+            current_time_sec = int(st.session_state.current_frame / fps)
+            total_time_sec = int(total_frames / fps)
+            t_curr = f"{current_time_sec // 60:02d}:{current_time_sec % 60:02d}"
+            t_tot = f"{total_time_sec // 60:02d}:{total_time_sec % 60:02d}"
+            st.markdown(f"<p style='color: white; text-align: right; margin-top: 8px;'><b>{t_curr} / {t_tot} (F: {st.session_state.current_frame})</b></p>", unsafe_allow_html=True)
+
+        # Línea de tiempo clásica (Slider horizontal inferior)
+        nuevo_frame = st.slider(
+            "Línea de Tiempo",
+            0,
+            max(0, total_frames - 1),
+            st.session_state.current_frame,
+            label_visibility="collapsed"
+        )
+        if nuevo_frame != st.session_state.current_frame:
+            st.session_state.current_frame = nuevo_frame
+            st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
         
         cap.release()
     else:

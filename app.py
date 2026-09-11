@@ -59,7 +59,7 @@ if "video_path" not in st.session_state:
     st.session_state.video_path = None
 
 if "elementos_tacticos" not in st.session_state:
-    st.session_state.elementos_tacticos = [] # Lista para almacenar anotaciones editables
+    st.session_state.elementos_tacticos = []
 
 if "current_frame" not in st.session_state:
     st.session_state.current_frame = 0
@@ -149,7 +149,7 @@ elif st.session_state.pantalla == "configuracion_proyecto":
 
 
 # ==========================================
-# PANTALLA 3: ÁREA DE TRABAJO TÁCTICO
+# PANTALLA 3: ÁREA DE TRABAJO TÁCTICO CON REPRODUCTOR Y HERRAMIENTAS
 # ==========================================
 elif st.session_state.pantalla == "trabajo":
     col_nav1, col_nav2 = st.columns([6, 1])
@@ -171,33 +171,19 @@ elif st.session_state.pantalla == "trabajo":
             fps = 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        # --- CONTROLES DE REPRODUCCIÓN Y TIMELINE EN SIDEBAR ---
-        st.sidebar.header("🎛️ Reproducción y Video")
         
-        col_p1, col_p2 = st.sidebar.columns(2)
-        with col_p1:
-            if st.button("▶ Play / Pausa"):
-                st.session_state.is_playing = not st.session_state.is_playing
-        with col_p2:
-            if st.button("⏹ Reiniciar"):
-                st.session_state.current_frame = 0
-                st.session_state.is_playing = False
+        # Evitar valores 0 en resolución si el video no carga dimensiones estándar
+        if width <= 0: width = 1280
+        if height <= 0: height = 720
 
-        # Slider de Línea de Tiempo
-        frame_idx = st.sidebar.slider("Fotograma actual", 0, max(0, total_frames - 1), st.session_state.current_frame)
-        st.session_state.current_frame = frame_idx
-
-        # --- HERRAMIENTAS TÁCTICAS Y EDICIÓN ---
-        st.sidebar.markdown("---")
-        st.sidebar.header("🛠️ Herramientas y Figuras")
+        # --- PANEL LATERAL DE HERRAMIENTAS Y GESTIÓN ---
+        st.sidebar.header("🛠️ Herramientas Tácticas")
         
         tipo_herramienta = st.sidebar.selectbox(
-            "Seleccionar Herramienta", 
+            "Seleccionar Figura / Herramienta", 
             ["Ninguna", "Foco Jugador (Moderno)", "Línea", "Flecha Recta", "Flecha Curva", "Círculo", "Triángulo", "Cuadrado", "Rombo"]
         )
 
-        # Selector de color e intensidad (opacidad/foco)
         color_nombre = st.sidebar.selectbox("Color", ["Amarillo", "Rojo", "Azul", "Blanco", "Verde"])
         color_map = {
             "Amarillo": (0, 255, 255),
@@ -207,18 +193,17 @@ elif st.session_state.pantalla == "trabajo":
             "Verde": (0, 255, 0)
         }
         col_bgr = color_map[color_nombre]
-        
-        intensidad = st.sidebar.slider("Intensidad / Opacidad de Foco", 0.1, 1.0, 0.4, 0.1)
+        intensidad = st.sidebar.slider("Intensidad / Opacidad del Foco", 0.1, 1.0, 0.4, 0.1)
+        grosor = st.sidebar.slider("Grosor de Línea", 1, 8, 3)
 
-        # Controles de coordenadas aproximadas para ubicar o crear la figura
         if tipo_herramienta != "Ninguna":
-            st.sidebar.subheader("Coordenadas / Posición")
-            x1 = st.sidebar.slider("Posición X1", 0, width if width > 0 else 1000, width // 3)
-            y1 = st.sidebar.slider("Posición Y1", 0, height if height > 0 else 1000, height // 3)
+            st.sidebar.subheader("Posición de la Figura")
+            x1 = st.sidebar.slider("Posición X (Centro / Inicio)", 0, width, width // 2)
+            y1 = st.sidebar.slider("Posición Y (Centro / Inicio)", 0, height, height // 2)
             
             if tipo_herramienta in ["Línea", "Flecha Recta", "Flecha Curva"]:
-                x2 = st.sidebar.slider("Posición X2", 0, width if width > 0 else 1000, (width // 3) + 150)
-                y2 = st.sidebar.slider("Posición Y2", 0, height if height > 0 else 1000, (height // 3) + 150)
+                x2 = st.sidebar.slider("Posición X Final", 0, width, (width // 2) + 150)
+                y2 = st.sidebar.slider("Posición Y Final", 0, height, (height // 2) + 150)
             else:
                 x2, y2 = x1 + 100, y1 + 100
 
@@ -226,22 +211,22 @@ elif st.session_state.pantalla == "trabajo":
             if tipo_herramienta == "Foco Jugador (Moderno)":
                 texto_foco = st.sidebar.text_input("Nombre del Jugador", "Jugador 1")
 
-            if st.sidebar.button("➕ Agregar Elemento al Frame"):
+            if st.sidebar.button("➕ Agregar al Fotograma Actual"):
                 nuevo_elem = {
                     "tipo": tipo_herramienta,
                     "x1": x1, "y1": y1,
                     "x2": x2, "y2": y2,
                     "color_rgb": col_bgr,
                     "intensidad": intensidad,
+                    "grosor": grosor,
                     "texto": texto_foco,
                     "frame": st.session_state.current_frame
                 }
                 st.session_state.elementos_tacticos.append(nuevo_elem)
                 st.sidebar.success("¡Elemento agregado con éxito!")
 
-        # --- GESTOR DE ELEMENTOS (EDITAR / ELIMINAR INDIVIDUALMENTE) ---
         st.sidebar.markdown("---")
-        st.sidebar.header("📋 Elementos en este Proyecto")
+        st.sidebar.header("📋 Elementos Guardados")
         if st.session_state.elementos_tacticos:
             for idx, el in enumerate(st.session_state.elementos_tacticos):
                 col_el1, col_el2 = st.sidebar.columns([3, 1])
@@ -252,82 +237,120 @@ elif st.session_state.pantalla == "trabajo":
                         st.session_state.elementos_tacticos.pop(idx)
                         st.rerun()
         else:
-            st.sidebar.info("No hay elementos agregados aún.")
+            st.sidebar.info("No hay elementos en este proyecto.")
 
-        # --- LEER FRAME DE VIDEO ---
+        # --- REPRODUCTOR DE VIDEO PROFESIONAL ---
+        st.markdown("### 🎬 Reproductor Táctico")
+        
+        c_btn1, c_btn2, c_btn3, c_btn4, c_info = st.columns([1, 1, 1, 1, 3])
+        with c_btn1:
+            if st.button("⏮ -10F"):
+                st.session_state.current_frame = max(0, st.session_state.current_frame - 10)
+                st.session_state.is_playing = False
+                st.rerun()
+        with c_btn2:
+            if st.session_state.is_playing:
+                if st.button("⏸ Pausa"):
+                    st.session_state.is_playing = False
+                    st.rerun()
+            else:
+                if st.button("▶ Reproducir"):
+                    st.session_state.is_playing = True
+                    st.rerun()
+        with c_btn3:
+            if st.button("⏹ Stop"):
+                st.session_state.current_frame = 0
+                st.session_state.is_playing = False
+                st.rerun()
+        with c_btn4:
+            if st.button("+10F ⏭"):
+                st.session_state.current_frame = min(total_frames - 1, st.session_state.current_frame + 10)
+                st.session_state.is_playing = False
+                st.rerun()
+        with c_info:
+            st.markdown(f"**Fotograma:** {st.session_state.current_frame} / {total_frames}")
+
+        nuevo_slider_frame = st.slider(
+            "Línea de Tiempo del Video",
+            0,
+            max(0, total_frames - 1),
+            st.session_state.current_frame,
+            key="timeline_slider"
+        )
+        if nuevo_slider_frame != st.session_state.current_frame:
+            st.session_state.current_frame = nuevo_slider_frame
+            st.session_state.is_playing = False
+            st.rerun()
+
+        # --- LEER Y DIBUJAR SOBRE EL FOTOGRAMA ACTUAL ---
         cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state.current_frame)
         ret, frame = cap.read()
 
         if ret and frame is not None:
-            # Renderizar todos los elementos tácticos guardados
+            # Renderizar elementos tácticos guardados para este fotograma
             for el in st.session_state.elementos_tacticos:
                 if el["frame"] == st.session_state.current_frame:
                     t = el["tipo"]
                     c = el["color_rgb"]
                     inte = el["intensidad"]
+                    g = el["grosor"]
                     
                     if t == "Foco Jugador (Moderno)":
                         cx, cy = int(el["x1"]), int(el["y1"])
                         overlay = frame.copy()
-                        cv2.circle(overlay, (cx, cy), 45, c, -1)
+                        cv2.circle(overlay, (cx, cy), 50, c, -1)
                         cv2.addWeighted(overlay, inte, frame, 1.0 - inte, 0, frame)
-                        cv2.circle(frame, (cx, cy), 45, c, 2)
-                        cv2.circle(frame, (cx, cy), 52, c, 1)
+                        cv2.circle(frame, (cx, cy), 50, c, g)
+                        cv2.circle(frame, (cx, cy), 58, c, 1)
                         if el["texto"]:
                             (tw, th), _ = cv2.getTextSize(el["texto"], cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                            tx, ty = cx - (tw // 2), cy - 60
+                            tx, ty = cx - (tw // 2), cy - 65
                             cv2.rectangle(frame, (tx - 6, ty - th - 6), (tx + tw + 6, ty + 6), (20, 20, 20), -1)
                             cv2.putText(frame, el["texto"], (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
                     elif t == "Línea":
-                        cv2.line(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, 3)
+                        cv2.line(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g)
 
                     elif t == "Flecha Recta":
-                        cv2.arrowedLine(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, 3, tipLength=0.2)
+                        cv2.arrowedLine(frame, (int(el["x1"]), int(el["y1"])), (int(el["x2"]), int(el["y2"])), c, g, tipLength=0.2)
 
                     elif t == "Flecha Curva":
-                        # Aproximación de flecha curva mediante puntos intermedios
                         pt1 = (int(el["x1"]), int(el["y1"]))
                         pt2 = (int(el["x2"]), int(el["y2"]))
-                        mid = ((pt1[0] + pt2[0]) // 2 + 40, (pt1[1] + pt2[1]) // 2 - 40)
+                        mid = ((pt1[0] + pt2[0]) // 2 + 50, (pt1[1] + pt2[1]) // 2 - 50)
                         pts_curve = np.array([pt1, mid, pt2], np.int32)
-                        cv2.polylines(frame, [pts_curve], False, c, 3)
-                        cv2.circle(frame, pt2, 5, c, -1)
+                        cv2.polylines(frame, [pts_curve], False, c, g)
+                        cv2.circle(frame, pt2, 6, c, -1)
 
                     elif t == "Círculo":
                         radio = int(np.hypot(el["x2"] - el["x1"], el["y2"] - el["y1"]))
-                        cv2.circle(frame, (int(el["x1"]), int(el["y1"])), max(10, radio), c, 2)
+                        cv2.circle(frame, (int(el["x1"]), int(el["y1"])), max(15, radio), c, g)
 
                     elif t in ["Triángulo", "Cuadrado", "Rombo"]:
                         x, y = int(el["x1"]), int(el["y1"])
-                        sz = 60
+                        sz = 70
                         if t == "Triángulo":
                             pts = np.array([[x, y - sz], [x - sz, y + sz], [x + sz, y + sz]], np.int32)
                         elif t == "Cuadrado":
                             pts = np.array([[x - sz, y - sz], [x + sz, y - sz], [x + sz, y + sz], [x - sz, y + sz]], np.int32)
                         elif t == "Rombo":
                             pts = np.array([[x, y - sz], [x + sz, y], [x, y + sz], [x - sz, y]], np.int32)
-                        cv2.polylines(frame, [pts], True, c, 3)
+                        cv2.polylines(frame, [pts], True, c, g)
 
             # Mostrar imagen procesada en pantalla
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            st.image(frame_rgb, caption=f"Fotograma {st.session_state.current_frame} de {total_frames}", use_container_width=True)
+            st.image(frame_rgb, use_container_width=True)
 
-            # --- LÍNEA DE TIEMPO VISUAL CON MARCADORES ---
-            st.markdown("### ⏱️ Línea de Tiempo y Eventos Tácticos")
-            timeline_cols = st.columns(min(10, max(1, total_frames // max(1, total_frames // 10) if total_frames > 10 else 1)))
-            
-            # Mostrar barra informativa de elementos marcados
             elementos_marcador = [e for e in st.session_state.elementos_tacticos if e["frame"] == st.session_state.current_frame]
             if elementos_marcador:
-                st.info(f"📌 {len(elementos_marcador)} herramienta(s) activa(s) en este fotograma.")
+                st.info(f"📌 {len(elementos_marcador)} herramienta(s) y figura(s) visible(s) en este fotograma.")
 
         else:
             st.error("No se pudo leer el fotograma del video.")
         
         cap.release()
 
-        # Manejo de reproducción automática si se activa Play
+        # Bucle de reproducción automática
         if st.session_state.is_playing:
             if st.session_state.current_frame < total_frames - 1:
                 st.session_state.current_frame += 1
